@@ -1,0 +1,601 @@
+
+{%  if not is_googlemaps_loaded()  %}
+{% if GOOGLEMAPS_KEY %}
+<!-- <script src="//maps.googleapis.com/maps/api/js?key={{GOOGLEMAPS_KEY}}&libraries=places&map_ids={{gmap.map_ids}}&language={{gmap.language}}&region={{gmap.region}}"  type="text/javascript"></script>        <script src="https://maps.googleapis.com/maps/api/js?key={{GOOGLEMAPS_KEY}}&libraries=places"></script> -->
+
+<script src="//maps.googleapis.com/maps/api/js?key={{GOOGLEMAPS_KEY}}&map_ids={{gmap.map_ids}}&language={{gmap.language}}&region={{gmap.region}}"  type="text/javascript"></script>        <!-- <script src="https://maps.googleapis.com/maps/api/js?key={{GOOGLEMAPS_KEY}}&libraries=places"></script> -->
+{%  else %}
+    <script  async defer src="//maps.googleapis.com/maps/api/js?language={{gmap.language}}&region={{gmap.region}}"  type="text/javascript" ></script>
+{%  endif %}
+{{ set_googlemaps_loaded() }}
+{% endif %}
+
+{% if gmap.cluster %}
+    <script src="//cdnjs.cloudflare.com/ajax/libs/js-marker-clusterer/1.0.0/markerclusterer_compiled.js" type="text/javascript"></script>
+    <!-- <script async defer src="https://unpkg.com/@googlemaps/markerclustererplus/dist/index.min.js" ></script> -->
+{%  endif %}
+
+<!DOCTYPE html>
+
+
+<style>
+#{{gmap.varname}} {
+  height:600px;
+}
+html, body {
+  height: 100%;
+  /* width: 100%; */
+  /* width: 100%; */
+  margin: 0;
+  padding: 0;
+}
+</style>
+
+<script async defer type="text/javascript">
+
+
+
+var {{gmap.varname}} = null;
+var {{gmap.varname}}_markers = [];
+var {{gmap.varname}}_rectangles = [];
+var {{gmap.varname}}_circles = [];
+var {{gmap.varname}}_polygons = [];
+var {{gmap.varname}}_polylines = [];
+var prev_infowindow_{{gmap.varname}} = null;
+
+function initialize_{{gmap.varname}}() {
+
+    geocoder = new google.maps.Geocoder();
+
+    // document.getElementById('{{gmap.identifier}}').style.display = 'block';
+    {{gmap.varname}} = new google.maps.Map(
+    document.getElementById('{{gmap.identifier}}'), {
+        center: new google.maps.LatLng({{gmap.center.0}}, {{gmap.center.1}}),
+        zoom: {{gmap.zoom}},
+        mapTypeId: google.maps.MapTypeId.{{gmap.maptype}},
+        zoomControl: {% if gmap.zoom_control %}true{% else %}false{% endif %},
+        mapTypeControl: {% if gmap.maptype_control %}true{% else %}false{% endif %},
+        mapTypeControlOptions: {
+        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+        position: google.maps.ControlPosition.TOP_CENTER,
+        },
+        scaleControl: {% if gmap.scale_control %}true{% else %}false{% endif %},
+        streetViewControl: {% if gmap.streetview_control %}true{% else %}false{% endif %},
+        rotateControl: {% if gmap.rotate_control %}true{% else %}false{% endif %},
+        scrollwheel: {% if gmap.scroll_wheel %}true{% else %}false{% endif %},
+        fullscreenControl: {% if gmap.fullscreen_control %}true{% else %}false{% endif %},
+        styles: {{ gmap.styles | tojson  }},
+        // gestureHandling: "greedy",
+    });
+
+    {{gmap.varname}}.setOptions({ gestureHandling: 'greedy' });
+
+
+    // var input = document.getElementById('search_markers');
+    // new google.maps.places.Autocomplete(input);
+
+    
+
+// google.maps.event.addDomListener(window, "resize", function() {
+
+//     // var center = {{gmap.varname}}.getCenter();
+//     var center  = new google.maps.LatLng({{gmap.center.0}}, {{gmap.center.1}});
+//     google.maps.event.trigger({{gmap.varname}}, "resize");
+//     {{gmap.varname}}.setCenter(center); 
+//     console.log("INTERNAL RESIZE");
+
+// });
+
+    //center map location on user location
+    {% if gmap.center_on_user_location %}
+        if (navigator.geolocation) {
+         navigator.geolocation.getCurrentPosition(function (position) {
+             initialLocation = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+             {{gmap.varname}}.setCenter(initialLocation);
+         });
+        }
+    {% endif %}
+
+    // add kml layer on map
+    // const ctaLayer = new google.maps.KmlLayer({
+    // url: "{{gmap.layer }}",
+    // map: {{gmap.varname}},
+    //  });
+
+    // add bicycle layer
+    // {% if gmap.bicycle_layer %}
+    //         const bicycleLayer = new google.maps.BicyclingLayer();
+    //         bicycleLayer.setMap({{gmap.varname}});
+    // {% endif %}
+
+
+    // add gmap markers
+    var raw_markers = {{gmap.markers|tojson|safe}};
+    for(i=0; i<{{gmap.markers|length}};i++) {
+        {{gmap.varname}}_markers[i] = new google.maps.Marker({
+            position: new google.maps.LatLng(raw_markers[i].lat, raw_markers[i].lng),
+            map: {{gmap.varname}},
+            icon: raw_markers[i].icon,
+            category: raw_markers[i].category ? raw_markers[i].category : null,
+            year: raw_markers[i].year ? raw_markers[i].year : null,
+            marker_id: raw_markers[i].marker_id ? raw_markers[i].marker_id : null,
+
+
+            // call_number: raw_markers[i].call_number ? raw_markers[i].call_number : null,
+            reason: raw_markers[i].reason ? raw_markers[i].reason : null,
+            action_taken: raw_markers[i].action_taken ? raw_markers[i].action_taken : null,
+            // date: raw_markers[i].date ? raw_markers[i].date : null,
+            location: raw_markers[i].location ? raw_markers[i].location : null,
+            lt: raw_markers[i].lt ? raw_markers[i].lt : null,
+            ln: raw_markers[i].ln ? raw_markers[i].ln : null,
+            // units: raw_markers[i].units ? raw_markers[i].units : null,
+            primary_id: raw_markers[i].primary_id ? raw_markers[i].primary_id : null,
+            // vehicle: raw_markers[i].vehicle ? raw_markers[i].vehicle : null,
+            // vehicle_towed: raw_markers[i].vehicle_towed ? raw_markers[i].vehicle_towed : null,
+            criminal_name: raw_markers[i].criminal_name ? raw_markers[i].criminal_name : null,
+            // criminal_age: raw_markers[i].criminal_age ? raw_markers[i].criminal_age : null,
+            // criminal_address: raw_markers[i].criminal_address ? raw_markers[i].criminal_address : null,
+            // criminal_charges: raw_markers[i].criminal_charges ? raw_markers[i].criminal_charges : null,
+
+            title: raw_markers[i].title ? raw_markers[i].title : null,
+            label: raw_markers[i].label ? raw_markers[i].label : null
+        });
+
+
+
+
+       if(raw_markers[i].infobox)
+       {
+            google.maps.event.addListener(
+                    {{gmap.varname}}_markers[i],
+                    'click',
+                    getInfoCallback({{gmap.varname}}, raw_markers[i].infobox),
+            );
+
+            //add delete handler
+            var delete_button = document.getElementById('deletButton')
+            google.maps.event.addListener({{gmap.varname}}_markers[i], 'dblclick', function(event) {
+                var value = this.marker_id;
+
+                $.ajax({
+
+                    contentType: "application/json",
+                    url: '/live',
+                    type: 'POST',
+                    data: JSON.stringify({'marker_id': value}),
+
+                });  
+               
+                    location.reload(true);
+
+            });
+
+
+
+
+
+
+            //backup delete handler
+            // google.maps.event.addListener({{gmap.varname}}_markers[i], 'dblclick', function(event) {
+            //     // console.log({{gmap.varname}}_markers); // This gets us something 
+
+
+            //     // console.log({{gmap.varname}}_markers[this.marker_id - 1]); // This works! 
+
+            //     console.log(this.marker_id);
+
+
+
+            //     // raw_markers[i].marker_id 
+            //     // this.setMap(null);
+            //     // delete {{gmap.varname}}_markers[i].marker_id;
+            //     // delete {{gmap.varname}}_markers[this.marker_id - 1];
+            // });
+
+
+
+
+
+       
+            // Can probbaly change infobox with raw_markers[i].infobox = "something"
+        //     google.maps.event.addListener({{gmap.varname}}_markers[i], "dblclick", function() {
+        //     // Add a alert: Are you sure you want to remove this marker?
+        //     var response = confirm("remove marker?");
+
+        //     if (response) {
+
+        //         for (var i = 0; i < {{gmap.varname}}_markers.length; i++) {
+
+        //             console.log({{gmap.varname}}_markers[i]);
+
+        //             {{gmap.varname}}_markers[i].setMap(null);
+
+        //         }
+
+        //         // console.log({{gmap.varname}}_markers);
+
+        //         // {{gmap.varname}}_markers.setMap(null);
+
+
+        //     } else {
+        //         console.log("else");
+        //     }
+
+        // });
+
+       }
+    }
+
+    // filter markers 
+
+    // add more filters here? 
+
+    // filterMarkers = function(category) {
+
+
+    //     for (i = 0; i < {{gmap.varname}}_markers.length; i++) {
+    //         marker ={{gmap.varname}}_markers[i];
+    //         // If is same category or category not picked
+    //         if (marker.category == category || category.length === 0) {
+    //             marker.setVisible(true);
+    //         }
+    //         // Categories don't match 
+    //         else {
+    //             marker.setVisible(false);
+    //         }
+    //     }
+    // }
+    
+
+    {% if gmap.report_clickpos %}
+    google.maps.event.addListener(
+        {{gmap.varname}},
+        'click',
+        function(event) { clickposCallback('{{gmap.clickpos_uri}}', event.latLng) }
+    );
+    {% endif %}        
+
+    {% if gmap.fit_markers_to_bounds %}
+        // fit all markers in bounds
+        var {{gmap.varname}}_bounds = new google.maps.LatLngBounds();
+        for(i=0; i<{{gmap.varname}}_markers.length;i++) {
+            {{gmap.varname}}_bounds.extend({{gmap.varname}}_markers[i].getPosition());
+        };
+        {{gmap.varname}}.fitBounds({{gmap.varname}}_bounds);
+    {% endif %}
+
+
+
+    // add rectangles
+    // var raw_rectangles = {{ gmap.rectangles|tojson|safe }};
+    // for(i = 0; i < {{ gmap.rectangles|length }}; i++) {
+    //     {{ gmap.varname }}_rectangles[i] = new google.maps.Rectangle({
+    //         strokeColor: raw_rectangles[i].stroke_color,
+    //         strokeOpacity: raw_rectangles[i].stroke_opacity,
+    //         strokeWeight: raw_rectangles[i].stroke_weight,
+    //         fillColor: raw_rectangles[i].fill_color,
+    //         fillOpacity: raw_rectangles[i].fill_opacity,
+    //         map: {{gmap.varname}},
+    //         bounds: {
+    //             north: raw_rectangles[i].bounds.north,
+    //             east: raw_rectangles[i].bounds.east,
+    //             south: raw_rectangles[i].bounds.south,
+    //             west: raw_rectangles[i].bounds.west },
+    //     });
+
+    //    if(raw_rectangles[i].infobox)
+    //    {
+    //         google.maps.event.addListener(
+    //                 {{gmap.varname}}_rectangles[i],
+    //                 'click',
+    //                 getInfoCallback({{gmap.varname}}, raw_rectangles[i].infobox)
+    //         );
+    //    }
+    // }
+
+    // add circles
+    // var raw_circles = {{ gmap.circles|tojson|safe }};
+    // for(i = 0; i < {{ gmap.circles|length }}; i++) {
+    //     {{ gmap.varname }}_circles[i] = new google.maps.Circle({
+    //         strokeColor: raw_circles[i].stroke_color,
+    //         strokeOpacity: raw_circles[i].stroke_opacity,
+    //         strokeWeight: raw_circles[i].stroke_weight,
+    //         fillColor: raw_circles[i].fill_color,
+    //         fillOpacity: raw_circles[i].fill_opacity,
+    //         map: {{gmap.varname}},
+    //         center: {
+    //             lat: raw_circles[i].center.lat,
+    //             lng: raw_circles[i].center.lng,
+    //         },
+    //         radius: raw_circles[i].radius,
+    //         clickable : raw_circles[i].clickable
+    //     });
+
+    //    if(raw_circles[i].infobox)
+    //    {
+    //         google.maps.event.addListener(
+    //                 {{gmap.varname}}_circles[i],
+    //                 'click',
+    //                 getInfoCallback({{gmap.varname}}, raw_circles[i].infobox)
+    //         );
+    //    }
+    // }
+
+    // add polygons
+    // var raw_polygons = {{ gmap.polygons|tojson|safe }};
+    // for(i = 0; i < {{ gmap.polygons|length }}; i++) {
+    //     {{ gmap.varname }}_polygons[i] = new google.maps.Polygon({
+    //         strokeColor: raw_polygons[i].stroke_color,
+    //         strokeOpacity: raw_polygons[i].stroke_opacity,
+    //         strokeWeight: raw_polygons[i].stroke_weight,
+    //         fillOpacity: raw_polygons[i].fill_opacity,
+    //         fillColor: raw_polygons[i].fill_color,
+    //         path: raw_polygons[i].path,
+    //         map: {{gmap.varname}},
+    //         geodesic: true
+    //     });
+
+    //    if(raw_polygons[i].infobox)
+    //    {
+    //         google.maps.event.addListener(
+    //                 {{gmap.varname}}_polygons[i],
+    //                 'click',
+    //                 getInfoCallback({{gmap.varname}}, raw_polygons[i].infobox)
+    //         );
+    //    }
+    // }
+
+    // add polylines
+    // var raw_polylines = {{ gmap.polylines|tojson|safe }};
+    // for(i = 0; i < {{ gmap.polylines|length }}; i++) {
+    //     {{ gmap.varname }}_polylines[i] = new google.maps.Polyline({
+    //         strokeColor: raw_polylines[i].stroke_color,
+    //         strokeOpacity: raw_polylines[i].stroke_opacity,
+    //         strokeWeight: raw_polylines[i].stroke_weight,
+    //         path: raw_polylines[i].path,
+    //         map: {{gmap.varname}},
+    //         geodesic: true
+    //     });
+
+    //    if(raw_polylines[i].infobox)
+    //    {
+    //         google.maps.event.addListener(
+    //                 {{gmap.varname}}_polylines[i],
+    //                 'click',
+    //                 getInfoCallback({{gmap.varname}}, raw_polylines[i].infobox)
+    //         );
+    //    }
+    // }
+
+    {% if gmap.cluster %}
+        var markerCluster = new MarkerClusterer({{gmap.varname}}, {{gmap.varname}}_markers, {'imagePath': "{{gmap.cluster_imagepath}}", 'maxZoom':18,'gridSize': {{gmap.cluster_gridsize}}});
+    {% endif %}
+}
+
+// END OF INITIALIZE // 
+
+
+// function isGoogleDomReady(infowindow){
+// 		google.maps.event.addListener(infowindow, 'domready', function () {			
+// 			$('#delete_marker').on('click', function() {				
+// 				// alert($('#mapNotes').val());	
+//                 // alert("delete?");	
+//                 var response = confirm("Are you sure you want to delete this marker?");
+                
+//                 if (response) {
+//                     console.log('delete');
+//                     {{gmap.varname}}_markers.setMap(null);
+//                 }
+//                 else {
+
+//                 }
+// 			});
+// 		});
+// 	}
+
+
+
+// function isValidAddress(address) {
+//     address_valid = new RegExp("/^[a-zA-Z0-9\s,.'-]{3,}$/ .");
+//     return address_valid
+// }
+
+
+
+// function isValidAddress(address) {
+//     var regex = /[,#-\/\s\!\@\$.....]/gi; // ... add all the characters you need
+//     if (regex.test(address)) {
+//     return true;
+//     }
+//     return false;
+// }
+
+function isValidAddress(address) {
+    var addyRegex = /^[0-9]+ .+$/
+    if (addyRegex.test(address)) {
+    return true;
+    }
+    return false;
+}
+
+function codeAddressRestricted(address)
+         {
+             var address = document.getElementById("search_markers").value;
+             geocoder.geocode({ 'address': address, componentRestrictions:{country:"US", postalCode: "01945"}}, function (results, status) {
+                 if (status == google.maps.GeocoderStatus.OK && isValidAddress(address)) {
+
+                    if (results[0].formatted_address != "Marblehead, MA 01945, USA") {
+
+                        
+
+                        {{gmap.varname}}.setCenter(results[0].geometry.location);
+                        {{gmap.varname}}.panTo(results[0].geometry.location);
+                        {{gmap.varname}}.setZoom(18);
+                        // console.log(results[0].geometry.location);
+
+                    } else {
+                        // alert("Please enter a more generic search term")
+                    }
+                     //Got result, center the map and put it out there
+                    //  {{gmap.varname}}.setCenter(results[0].geometry.location);
+                    //  {{gmap.varname}}.panTo(results[0].geometry.location);
+                    //  {{gmap.varname}}.setZoom(17);
+                    //  var marker = new google.maps.Marker({
+                    //      map: {{gmap.varname}},
+                    //      position: results[0].geometry.location
+
+                    //      // ZOOM ^ HERE INSTEAD OF CREATING MARKER 
+                    //  });
+
+                 } else {
+                    //  alert("Please enter a more : " + status);
+                    //  console.log("Possible address error, address is: ", address);
+                 }
+             });
+         }
+
+
+// function codeAddress() { 
+//     var sAddress = document.getElementById("search_markers").value;
+//     geocoder.geocode( { 'address': sAddress}, function(results, status) { 
+//             if (status == google.maps.GeocoderStatus.OK) {
+//                 // map.setCenter(results[0].geometry.location);
+//                 // var marker = new google.maps.Marker({
+//                 // map: {{gmap.varname}},
+//                 // position: results[0].geometry.location
+//                 // });
+//             }
+//             else{
+//             alert("Geocode was not successful for the following reason: " + status);
+//             }
+//         });
+
+
+filterMarkers = function(category) {
+
+
+    for (i = 0; i < {{gmap.varname}}_markers.length; i++) {
+        marker ={{gmap.varname}}_markers[i];
+        // If is same category or category not picked
+        if (marker.category == category || category.length === 0) {
+            marker.setVisible(true);
+        }
+        // Categories don't match 
+        else {
+            marker.setVisible(false);
+        }
+    }
+}
+
+// markersByYear = function(year) {
+
+
+//     for (i = 0; i < {{gmap.varname}}_markers.length; i++) {
+//         marker ={{gmap.varname}}_markers[i];
+//         // If is same year or year not picked
+//         if (marker.year == year || year.length === 0) {
+//             marker.setVisible(true);
+//         }
+//         // year doesn't match 
+//         else {
+//             marker.setVisible(false);
+//         }
+//     }
+// }
+
+
+function getInfoCallback(map, content) {
+    var infowindow = new google.maps.InfoWindow({content: content });
+    return function(ev) {
+        if( prev_infowindow_{{gmap.varname}} ) {
+            prev_infowindow_{{gmap.varname}}.close();
+        }
+        prev_infowindow_{{gmap.varname}} = infowindow;
+        infowindow.setPosition(ev.latLng);
+        infowindow.setContent(content);
+        infowindow.open(map, this);
+
+        // isGoogleDomReady(infowindow);
+
+    };
+
+
+}
+
+
+// function isGoogleDomReady(infowindow){
+// 		google.maps.event.addListener(infowindow, 'domready', function () {			
+// 			$('#SaveBtn').on('click', function() {				
+// 				// alert($('#mapNotes').val());
+//                 // console.log(Object.keys(infowindow));	
+//                 console.log(infowindow.content);			
+// 			});
+// 		});
+// 	}
+
+function clickposCallback(uri, latLng) {
+    xhttp = new XMLHttpRequest();
+    xhttp.open("POST", uri);
+    xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+    xhttp.send("lat=" + latLng.lat() + "&lng="  + latLng.lng());
+}
+
+{% if gmap.collapsible %}
+    function init_{{gmap.identifier}}_button() {
+        document.getElementById('{{gmap.identifier}}').style.display = 'none';
+        document.getElementById('{{gmap.varname}}_collapse').onclick = function() {
+        if ({{gmap.varname}} === null) {
+                initialize_{{gmap.varname}}();
+                document.getElementById('{{gmap.varname}}_collapse').textContent = 'Hide {{gmap.varname}}';
+            } else {
+                var m = document.getElementById('{{gmap.identifier}}');
+                if (m.style.display !== 'none') {
+                    m.style.display = 'none';
+                    document.getElementById('{{gmap.varname}}_collapse').textContent = 'Show {{gmap.varname}}';
+                } else {
+                    m.style.display = 'block';
+                    document.getElementById('{{gmap.varname}}_collapse').textContent = "Hide {{gmap.varname}}";
+                }
+            }
+        }
+        {% if gmap.mapdisplay %}
+        document.getElementById('{{gmap.varname}}_collapse').click();
+        {% endif %}
+    };
+
+    if (typeof window.onload === 'function') {
+        func = window.onload;
+        window.onload = function() {
+            func();
+            init_{{gmap.identifier}}_button();
+        }
+    } else {
+        window.onload = init_{{gmap.identifier}}_button;
+    }
+{% else %}
+    google.maps.event.addDomListener(window, 'load', initialize_{{gmap.varname}}); // HERE 
+{% endif %}
+
+
+
+
+
+
+        // function initialize() {
+        //   var input = document.getElementById('search_markers');
+        //   var autocomplete = new google.maps.places.Autocomplete(input);
+        //     google.maps.event.addListener(autocomplete, 'place_changed', function () {
+        //         var place = autocomplete.getPlace();
+        //         document.getElementById('city2').value = place.name;
+        //         document.getElementById('cityLat').value = place.geometry.location.lat();
+        //         document.getElementById('cityLng').value = place.geometry.location.lng();
+        //     });
+        // }
+        // google.maps.event.addDomListener(window, 'load', initialize);
+
+</script>
+
+
+<!-- <script async defer src="https://unpkg.com/deck.gl@^7.0.0/dist.min.js" ></script> -->
+
+<!-- <script async defer src="https://maps.googleapis.com/maps-api-v3/api/js/42/6/kml.js"></script> -->
